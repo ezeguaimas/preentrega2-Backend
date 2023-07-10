@@ -5,20 +5,20 @@ class ProductManagerDB {
     this.productsModel = productsModel;
   }
 
-  async getProducts(req, res) {
-    try {
-      const limit = req.query.limit;
-      const products = await productsModel.find();
-      if (limit) {
-        const limitedProducts = products.slice(0, limit);
-        res.status(200).send(limitedProducts);
-      } else {
-        res.status(200).send(products);
-      }
-    } catch (error) {
-      res.status(500).send({ error: "Error al obtener los productos" });
-    }
-  }
+ async getProducts(req, res) {
+   try {
+     const limit = req.query.limit;
+     const products = await productsModel.find();
+     if (limit) {
+       const limitedProducts = products.slice(0, limit);
+       res.status(200).send(limitedProducts);
+     } else {
+       res.status(200).send(products);
+     }
+   } catch (error) {
+     res.status(500).send({ error: "Error al obtener los productos" });
+   }
+ }
 
   async getProductById(req, res) {
     try {
