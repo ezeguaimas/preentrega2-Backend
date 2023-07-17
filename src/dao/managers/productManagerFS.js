@@ -16,9 +16,7 @@ export default class ProductManager {
       const data = readFileSync(this.path, "utf8");
       this.products = JSON.parse(data);
       return this.products;
-    } catch (error) {
-      console.log(error);
-      
+    } catch (error) {      
       return "Error cargando productos";
     }
   }

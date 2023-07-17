@@ -5,20 +5,93 @@ class ProductManagerDB {
     this.productsModel = productsModel;
   }
 
- async getProducts(req, res) {
-   try {
-     const limit = req.query.limit;
-     const products = await productsModel.find();
-     if (limit) {
-       const limitedProducts = products.slice(0, limit);
-       res.status(200).send(limitedProducts);
-     } else {
-       res.status(200).send(products);
-     }
-   } catch (error) {
-     res.status(500).send({ error: "Error al obtener los productos" });
-   }
- }
+  getProducts = async (
+    limit = 10,
+    page = 1,
+    sort,
+    category,
+    available,
+    baseUrl
+  ) => {
+    try {
+      let query = this.productsModel.find();
+      if (category) {
+        const trimmedCategory = category.trim();
+        const categoryRegex = new RegExp(`^${trimmedCategory}$`, "i");
+        query = query.where("category").equals(categoryRegex);
+      }
+      if (available) {
+        const lowerAvailable = available.toLowerCase();
+        if (lowerAvailable === "true") {
+          query = query.where("stock").gt(0);
+        } else if (lowerAvailable === "false") {
+          query = query.where("stock").equals(0);
+        } else {
+          throw new Error(
+            "Valor de available inválido. Se espera true o false"
+          );
+        }
+      }
+      if (sort) {
+        const lowerSort = sort.toLowerCase();
+        if (lowerSort === "asc") {
+          query = query.sort({ price: 1 });
+        } else if (lowerSort === "desc") {
+          query = query.sort({ price: -1 });
+        } else {
+          throw new Error("Valor de sort inválido. Se espera asc or desc");
+        }
+      }
+
+      const products = await this.productsModel.paginate(query, {
+        limit: parseInt(limit) || 10,
+        lean: true,
+        page: parseInt(page) || 1,
+        customLabels: {
+          docs: "products",
+          totalDocs: "totalProducts",
+        },
+      });
+
+      let navLinks = {};
+
+      if (baseUrl) {
+        const sortOptions = ["asc", "desc"];
+        const availableOptions = ["true", "false"];
+        const sortQuery =
+          sort && sortOptions.includes(sort.toLowerCase())
+            ? `&sort=${sort}`
+            : "";
+        const categoryQuery = category
+          ? `&category=${encodeURIComponent(category)}`
+          : "";
+        const availableQuery =
+          available && availableOptions.includes(available.toLowerCase())
+            ? `&available=${available}`
+            : "";
+        navLinks = {
+          firstLink:
+            products.totalPages > 1
+              ? `${baseUrl}?limit=${limit}&page=1${sortQuery}${categoryQuery}${availableQuery}`
+              : null,
+          prevLink: products.hasPrevPage
+            ? `${baseUrl}?limit=${limit}&page=${products.prevPage}${sortQuery}${categoryQuery}${availableQuery}`
+            : null,
+          nextLink: products.hasNextPage
+            ? `${baseUrl}?limit=${limit}&page=${products.nextPage}${sortQuery}${categoryQuery}${availableQuery}`
+            : null,
+          lastLink:
+            products.totalPages > 1
+              ? `${baseUrl}?limit=${limit}&page=${products.totalPages}${sortQuery}${categoryQuery}${availableQuery}`
+              : null,
+        };
+      }
+      const productsWithLinks = { ...products, ...navLinks };
+      return productsWithLinks;
+    } catch (error) {
+      throw new Error(`Error al obtener los datos: ${error.message}`);
+    }
+  };
 
   async getProductById(req, res) {
     try {
@@ -111,32 +184,25 @@ class ProductManagerDB {
           .status(400)
           .send({ error: "Todos los campos son obligatorios" });
       }
-      const codeRepeat = productsModel.findOne({ code: code });
-      if (codeRepeat) {
-        return res
-          .status(400)
-          .send({ error: "El código del producto ya existe" });
-      } else {
-        const product = await productsModel.findOne({ _id: productId });
+      const product = await productsModel.findOne({ _id: productId });
 
-        if (product === null) {
-          res.status(404).send({ error: "Producto no encontrado" });
-        } else {
-          const updatedProduct = await productsModel.updateOne(
-            { _id: productId },
-            {
-              title: title,
-              description: description,
-              code: code,
-              price: price,
-              status: status,
-              stock: stock,
-              category: category,
-              thumbnails: thumbnails,
-            }
-          );
-          res.status(200).send({ message: "Producto modificado exitosamente" });
-        }
+      if (product === null) {
+        res.status(404).send({ error: "Producto no encontrado" });
+      } else {
+        const updatedProduct = await productsModel.updateOne(
+          { _id: productId },
+          {
+            title: title,
+            description: description,
+            code: code,
+            price: price,
+            status: status,
+            stock: stock,
+            category: category,
+            thumbnails: thumbnails,
+          }
+        );
+        res.status(200).send({ message: "Producto modificado exitosamente" });
       }
     } catch (error) {
       throw new Error("Error al modificar el producto");
@@ -172,7 +238,9 @@ class ProductManagerDB {
           status: true,
           stock: 25,
           category: "categoria producto 1",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 2",
@@ -182,7 +250,9 @@ class ProductManagerDB {
           status: true,
           stock: 10,
           category: "categoria producto 2",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 3",
@@ -192,7 +262,9 @@ class ProductManagerDB {
           status: true,
           stock: 50,
           category: "categoria producto 3",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 4",
@@ -202,7 +274,9 @@ class ProductManagerDB {
           status: true,
           stock: 15,
           category: "categoria producto 4",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 5",
@@ -212,7 +286,9 @@ class ProductManagerDB {
           status: true,
           stock: 5,
           category: "categoria producto 5",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 6",
@@ -222,7 +298,9 @@ class ProductManagerDB {
           status: true,
           stock: 30,
           category: "categoria producto 6",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 7",
@@ -232,7 +310,9 @@ class ProductManagerDB {
           status: true,
           stock: 20,
           category: "categoria producto 7",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 8",
@@ -242,7 +322,9 @@ class ProductManagerDB {
           status: true,
           stock: 8,
           category: "categoria producto 8",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 9",
@@ -252,7 +334,9 @@ class ProductManagerDB {
           status: true,
           stock: 18,
           category: "categoria producto 9",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 10",
@@ -262,7 +346,9 @@ class ProductManagerDB {
           status: true,
           stock: 12,
           category: "categoria producto 10",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 11",
@@ -272,7 +358,9 @@ class ProductManagerDB {
           status: true,
           stock: 19,
           category: "categoria producto 11",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 12",
@@ -282,7 +370,9 @@ class ProductManagerDB {
           status: true,
           stock: 12,
           category: "categoria producto 12",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 13",
@@ -292,7 +382,9 @@ class ProductManagerDB {
           status: true,
           stock: 13,
           category: "categoria producto 13",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 14",
@@ -302,7 +394,9 @@ class ProductManagerDB {
           status: true,
           stock: 14,
           category: "categoria producto 14",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
         {
           title: "producto 15",
@@ -312,12 +406,13 @@ class ProductManagerDB {
           status: true,
           stock: 15,
           category: "categoria producto 15",
-          thumbnails: [],
+          thumbnails: [
+            "https://thumbs.dreamstime.com/z/best-product-year-spanish-award-ribbon-el-mejor-producto-del-ano-french-business-83173527.jpg?w=992",
+          ],
         },
       ]);
       res.status(200).send({ message: "Productos agregados exitosamente" });
     } catch (error) {
-      console.error(error);
       throw new Error("Error al agregar los productos");
     }
   }

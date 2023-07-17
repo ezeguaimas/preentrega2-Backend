@@ -23,17 +23,17 @@ const schema = new mongoose.Schema({
   },
 });
 
-schema.pre("find", function () {
-  this.populate("products.product");
-});
+// schema.pre("find", function () {
+//   this.populate("products.product");
+// });
 
-schema.pre("findById", function () {
-  this.populate("products.product");
-});
+// schema.pre("findById", function () {
+//   this.populate("products.product");
+// });
 
-schema.pre("findOne", function () {
-  this.populate("products.product");
-});
+// schema.pre("findOne", function () {
+//   this.populate("products.product");
+// });
 
 
 const cartsModel = mongoose.model(collection, schema);
